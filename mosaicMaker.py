@@ -4,6 +4,7 @@ import numpy as np
 import concurrent.futures
 from PIL import Image
 from scipy import spatial
+import sqlite3
 
 
 def importAndResizeTile(tilePath, size, isPortraitBool=False, flip=False):
@@ -40,14 +41,257 @@ def isLandscape(image):
     return image.size[0] > image.size[1]
 
 
+def printMenu():
+    print("1. Select main image")
+    print("2. Select folder for tile images")
+    print("3. Select multiplier for the tile size")
+    print("4. Select the ratios for the tiles")
+    print("5. Select the epsilon used for limiting repeats of tiles (optional)")
+    print("6. Select the multiplier for the \"upscaling\" of the main image (optional)")
+    print("7. Select output file name (optional)")
+    print("8. Select output folder (optional)")
+    print("9. Run mosaic maker")
+    print("10. Database menu")
+    print("11. Exit")
+    print("Choose an option: ", end='')
+
+
+def printDatabaseMenu():
+    print("1. Save current settings to database")
+    print("2. Load settings from database")
+    print("3. Delete settings from database")
+    print("4. Show all settings in database")
+    print("5. Exit")
+
+
+def isReadyCheck(main_photo, tiles, tile_multiplier, ratios):
+    return main_photo[0] is not None and \
+           tiles[0] is not None and \
+           tile_multiplier[0] is not None and \
+           ratios[0] is not None
+
+
+def saveSettings(main_photo, tiles, tile_multiplier, ratios, epsilon, upscaling_multiplier, output_file_name,
+                 output_folder, name):
+    conn = sqlite3.connect('settings.db')
+    c = conn.cursor()
+    create_table = """CREATE TABLE IF NOT EXISTS settings (
+                        setting_name text NOT NULL PRIMARY KEY,
+                        main_photo text,
+                        tiles text,
+                        tile_multiplier integer,
+                        width integer,
+                        height integer,
+                        epsilon real,
+                        upscaling_multiplier integer,
+                        output_file_name text,
+                        output_folder text
+                    );"""
+    c.execute(create_table)
+    insert = """INSERT INTO settings (setting_name, main_photo, tiles, tile_multiplier, width, height, epsilon, upscaling_multiplier, output_file_name, output_folder)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+    c.execute(insert, (
+        name,
+        main_photo,
+        tiles,
+        tile_multiplier,
+        ratios[0],
+        ratios[1],
+        epsilon,
+        upscaling_multiplier,
+        output_file_name,
+        output_folder))
+    conn.commit()
+    conn.close()
+
+
+def loadSettings(name):
+    conn = sqlite3.connect('settings.db')
+    c = conn.cursor()
+    select = """SELECT * FROM settings WHERE name = ?"""
+    c.execute(select, (name,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+
+def deleteSettings(name):
+    conn = sqlite3.connect('settings.db')
+    c = conn.cursor()
+    delete = """DELETE FROM settings WHERE name = ?"""
+    c.execute(delete, (name,))
+    conn.commit()
+    conn.close()
+
+
+def printSettings():
+    conn = sqlite3.connect('settings.db')
+    c = conn.cursor()
+    select = """SELECT * FROM settings"""
+    c.execute(select)
+    result = c.fetchall()
+    conn.close()
+    for row in result:
+        print(row)
+
+
+def main():
+    main_photo_path = [None, False]
+    tile_photos_path = [None, False]
+    tile_size_multiplier = [None, False]
+    tile_size_ratio = [None, False]
+    epsilon = [None, False]
+    main_photo_size_multiplier = [None, False]
+    output_file_name = [None, False]
+    output_folder = [None, False]
+    isReady = False
+    maker = None
+    while True:
+        print("Current settings:")
+        print("Main photo path: " + str(main_photo_path[0]))
+        print("Tile photos path: " + str(tile_photos_path[0]))
+        print("Tile size multiplier: " + str(tile_size_multiplier[0]))
+        print("Tile size ratio: " + str(tile_size_ratio[0]))
+        print("Epsilon: " + str(epsilon[0]))
+        print("Main photo size multiplier: " + str(main_photo_size_multiplier[0]))
+        print("Output file name: " + str(output_file_name[0]))
+        print("Output folder: " + str(output_folder[0]))
+        printMenu()
+        option = input()
+        match option:
+            case '1':
+                print("Enter the path to the main image: ", end='')
+                main_photo_path[0] = input()
+                main_photo_path[1] = True
+                isReady = isReadyCheck(main_photo_path, tile_photos_path, tile_size_multiplier, tile_size_ratio)
+            case '2':
+                print("Enter the path to the folder with the tile images: ", end='')
+                tile_photos_path[0] = input()
+                tile_photos_path[0] = '\\'.join((tile_photos_path[0], '*'))
+                tile_photos_path[1] = True
+                isReady = isReadyCheck(main_photo_path, tile_photos_path, tile_size_multiplier, tile_size_ratio)
+            case '3':
+                print("Enter the multiplier for the tile size: ", end='')
+                tile_size_multiplier[0] = int(input())
+                tile_size_multiplier[1] = True
+                isReady = isReadyCheck(main_photo_path, tile_photos_path, tile_size_multiplier, tile_size_ratio)
+            case '4':
+                print("Enter the ratios for the tiles (in the format of width:height e.g. 1:1, 2:3, 3:2): ", end='')
+                tile_size_ratio[0] = input()
+                tile_size_ratio[0] = tile_size_ratio[0].split(':')
+                tile_size_ratio[0] = (int(tile_size_ratio[0][0]), int(tile_size_ratio[0][1]))
+                tile_size_ratio[1] = True
+                isReady = isReadyCheck(main_photo_path, tile_photos_path, tile_size_multiplier, tile_size_ratio)
+            case '5':
+                print("Enter the epsilon used for limiting repeats of tiles: ", end='')
+                epsilon[0] = float(input())
+                epsilon[1] = True
+            case '6':
+                print("Enter the multiplier for the \"upscaling\" of the main image: ", end='')
+                main_photo_size_multiplier[0] = int(input())
+                main_photo_size_multiplier[1] = True
+            case '7':
+                print("Enter the output file name: ", end='')
+                output_file_name[0] = input()
+                output_file_name[1] = True
+            case '8':
+                print("Enter the output folder: ", end='')
+                output_folder[0] = input()
+                output_folder[1] = True
+            case '9':
+                if isReady:
+                    if maker is None:
+                        maker = MosaicMaker(main_photo_path[0], tile_photos_path[0], tile_size_multiplier[0],
+                                            tile_size_ratio[0], epsilon[0], main_photo_size_multiplier[0],
+                                            output_file_name[0],
+                                            output_folder[0])
+                    else:
+                        if main_photo_path[1]:
+                            maker.setMainPhotoPath(main_photo_path[0])
+                            main_photo_path[1] = False
+                        if tile_photos_path[1]:
+                            maker.setTileFolder(tile_photos_path[0])
+                            tile_photos_path[1] = False
+                        if tile_size_multiplier[1]:
+                            maker.setTileSizeMultiplier(tile_size_multiplier[0])
+                            tile_size_multiplier[1] = False
+                        if tile_size_ratio[1]:
+                            maker.setTileSizeRatio(tile_size_ratio[0])
+                            tile_size_ratio[1] = False
+                        if epsilon[1]:
+                            maker.setEpsilon(epsilon[0])
+                            epsilon[1] = False
+                        if main_photo_size_multiplier[1]:
+                            maker.setMainPhotoSizeMultiplier(main_photo_size_multiplier[0])
+                            main_photo_size_multiplier[1] = False
+                        if output_file_name[1]:
+                            maker.setOutputFileName(output_file_name[0])
+                            output_file_name[1] = False
+                        if output_folder[1]:
+                            maker.setOutputPath(output_folder[0])
+                            output_folder[1] = False
+                    maker.create_mosaic()
+                else:
+                    print("Not all required options are selected!")
+            case '10':
+                while True:
+                    printDatabaseMenu()
+                    option = input()
+                    match option:
+                        case '1':
+                            if isReady:
+                                name = input("Enter the name of the settings: ")
+                                saveSettings(main_photo_path[0], tile_photos_path[0], tile_size_multiplier[0],
+                                             tile_size_ratio[0], epsilon[0], main_photo_size_multiplier[0],
+                                             output_file_name[0], output_folder[0], name)
+                            else:
+                                print("Not all required options are selected!")
+                        case '2':
+                            name = input("Enter the name of the settings you want to load: ")
+                            result = loadSettings(name)
+                            if result is not None:
+                                main_photo_path[0] = result[1]
+                                tile_photos_path[0] = result[2]
+                                tile_size_multiplier[0] = result[3]
+                                tile_size_ratio[0] = (result[4], result[5])
+                                epsilon[0] = result[6]
+                                main_photo_size_multiplier[0] = result[7]
+                                output_file_name[0] = result[8]
+                                output_folder[0] = result[9]
+                                isReady = isReadyCheck(main_photo_path, tile_photos_path, tile_size_multiplier,
+                                                       tile_size_ratio)
+                            else:
+                                print("No settings with that id!")
+                        case '3':
+                            name = input("Enter the name of the settings you want to delete: ")
+                            deleteSettings(name)
+                        case '4':
+                            printSettings()
+                        case '5':
+                            break
+            case '11':
+                break
+            case _:
+                print("Invalid option!")
+        print()
+
+
 class MosaicMaker:
 
     def __init__(self, main_photo_path, tile_folder_path, tile_size_multiplier, tile_size_ratio, epsilon=0.0,
                  main_photo_size_multiplier=1, output_path=None, output_file_name=None, flip=False):
         self.main_photo_path = main_photo_path
+        self.tile_size_multiplier = tile_size_multiplier
+        self.tile_size_ratio = tile_size_ratio
         self.tile_size = (tile_size_ratio[0] * tile_size_multiplier, tile_size_ratio[1] * tile_size_multiplier)
-        self.epsilon = epsilon
-        self.size_increase_multiplier = main_photo_size_multiplier
+        if epsilon is None:
+            self.epsilon = 0.0
+        else:
+            self.epsilon = epsilon
+        if main_photo_size_multiplier is None:
+            self.size_increase_multiplier = 1
+        else:
+            self.size_increase_multiplier = main_photo_size_multiplier
         self.tile_folder_path = tile_folder_path
         self.output_path = output_path
         self.output_file_name = output_file_name
@@ -62,7 +306,10 @@ class MosaicMaker:
         self.executor = concurrent.futures.ThreadPoolExecutor()
         self.colors_ready = False
         self.is_portrait = ratioIsPortrait(tile_size_ratio)
-        self.flip = flip
+        if flip is None:
+            self.flip = False
+        else:
+            self.flip = flip
         self.main_photo = None
         self.resized_photo = None
         self.changed = True
@@ -80,7 +327,7 @@ class MosaicMaker:
 
     def get_tile_list(self):
         tile_paths = []
-        for file in glob.glob(tile_photos_path):
+        for file in glob.glob(self.tile_folder_path):
             if file.__contains__("Summary"):
                 continue
             if os.path.isfile(file):
@@ -155,11 +402,11 @@ class MosaicMaker:
         print(f"Mosaic {self.final_output_path} created")
 
     def setTileSizeRatio(self, ratio):
-        self.tile_size = (ratio[0] * self.tile_size[0], ratio[1] * self.tile_size[1])
+        self.tile_size = (ratio[0] * self.tile_size_multiplier, ratio[1] * self.tile_size_multiplier)
         self.changed = True
 
     def setTileSizeMultiplier(self, multiplier):
-        self.tile_size = (multiplier * self.tile_size[0], multiplier * self.tile_size[1])
+        self.tile_size = (multiplier * self.tile_size_ratio[0], multiplier * self.tile_size_ratio[1])
         self.changed = True
 
     def setMainPhotoSizeMultiplier(self, multiplier):
@@ -192,13 +439,4 @@ class MosaicMaker:
 
 
 if __name__ == "__main__":
-    main_photo_path = input("Enter the path to the main photo: ")
-    tile_photos_path = input("Enter the path to the tile photos: ")
-    tile_photos_path += "\\*"
-    tile_size_multiplier = int(input("Enter the tile size multiplier: "))
-    tile_size_ratio = (int(input("Enter the tile width ratio: ")), int(input("Enter the tile height ratio: ")))
-    epsilon = float(input("Enter the epsilon value: "))
-    multiplier = int(input("Enter the main photo size multiplier: "))
-    print("\n")
-    maker = MosaicMaker(main_photo_path, tile_photos_path, tile_size_multiplier, tile_size_ratio, epsilon, multiplier)
-    maker.create_mosaic()
+    main()

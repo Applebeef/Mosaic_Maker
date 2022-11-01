@@ -108,7 +108,7 @@ def saveSettings(main_photo, tiles, tile_multiplier, ratios, epsilon, upscaling_
 def loadSettings(name):
     conn = sqlite3.connect('settings.db')
     c = conn.cursor()
-    select = """SELECT * FROM settings WHERE name = ?"""
+    select = """SELECT * FROM settings WHERE setting_name = ?"""
     c.execute(select, (name,))
     result = c.fetchone()
     conn.close()
@@ -118,7 +118,7 @@ def loadSettings(name):
 def deleteSettings(name):
     conn = sqlite3.connect('settings.db')
     c = conn.cursor()
-    delete = """DELETE FROM settings WHERE name = ?"""
+    delete = """DELETE FROM settings WHERE setting_name = ?"""
     c.execute(delete, (name,))
     conn.commit()
     conn.close()

@@ -337,6 +337,9 @@ class MosaicMaker:
 
     def get_colors(self):
         # Calculate dominant color
+        self.tile_list.clear()
+        self.colors.clear()
+        self.counters.clear()
         for tiles in concurrent.futures.as_completed(self.futures):
             if tiles.result() is None:
                 continue

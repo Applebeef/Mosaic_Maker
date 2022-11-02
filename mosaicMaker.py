@@ -230,6 +230,7 @@ def main():
                         if output_folder[1]:
                             maker.setOutputPath(output_folder[0])
                             output_folder[1] = False
+                    print("Making mosaic...")
                     maker.create_mosaic()
                 else:
                     print("Not all required options are selected!")
@@ -321,7 +322,10 @@ class MosaicMaker:
             filename = self.output_file_name
 
         if self.output_path is None:
-            self.final_output_path = filename
+            # create output folder if it doesn't exist
+            if not os.path.exists('output'):
+                os.makedirs('output')
+            self.final_output_path = '\\'.join(('output', filename))
         else:
             self.final_output_path = '\\'.join((self.output_path, filename))
 

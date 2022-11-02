@@ -140,7 +140,7 @@ def main():
     tile_photos_path = [None, False]
     tile_size_multiplier = [None, False]
     tile_size_ratio = [None, False]
-    epsilon = [None, False]
+    epsilon = [0, False]
     main_photo_size_multiplier = [None, False]
     output_file_name = [None, False]
     output_folder = [None, False]
@@ -252,13 +252,21 @@ def main():
                             result = loadSettings(name)
                             if result is not None:
                                 main_photo_path[0] = result[1]
+                                main_photo_path[1] = True
                                 tile_photos_path[0] = result[2]
+                                tile_photos_path[1] = True
                                 tile_size_multiplier[0] = result[3]
+                                tile_size_multiplier[1] = True
                                 tile_size_ratio[0] = (result[4], result[5])
+                                tile_size_ratio[1] = True
                                 epsilon[0] = result[6]
+                                epsilon[1] = True
                                 main_photo_size_multiplier[0] = result[7]
+                                main_photo_size_multiplier[1] = True
                                 output_file_name[0] = result[8]
+                                output_file_name[1] = True
                                 output_folder[0] = result[9]
+                                output_folder[1] = True
                                 isReady = isReadyCheck(main_photo_path, tile_photos_path, tile_size_multiplier,
                                                        tile_size_ratio)
                             else:

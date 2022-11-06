@@ -364,12 +364,11 @@ class MosaicMaker:
         self.colors_ready = True
 
     def get_main_photo(self):
-        self.main_photo = Image.open(self.main_photo_path)
+        self.main_photo = Image.open(self.main_photo_path).convert('RGB')
         self.main_photo = self.main_photo.resize((self.main_photo.size[0] * self.size_increase_multiplier,
                                                   self.main_photo.size[1] * self.size_increase_multiplier))
         width = int(np.round(self.main_photo.size[0] / self.tile_size[0]))
         height = int(np.round(self.main_photo.size[1] / self.tile_size[1]))
-
         self.resized_photo = self.main_photo.resize((width, height))
 
     def setup(self):
